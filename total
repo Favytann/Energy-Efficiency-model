@@ -1,0 +1,101 @@
+import pandas as pd
+import joblib
+import re
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, mean_squared_error, confusion_matrix
+
+# Load the dataset
+file_path = "c:/users/emmanuel/desktop/Calificación_energética.csv"
+df = pd.read_csv(file_path)
+
+# Function to extract latitude and longitude from geometry
+def extract_coordinates(geometry):
+    match = re.search(r"POINT Z \(([-\d\.]+) ([-\d\.]+) [-\d\.]+\)", geometry)
+    if match:
+        return float(match.group(1)), float(match.group(2))  # Longitude, Latitude
+    return None, None
+
+# Apply the function to extract coordinates
+df["Longitude"], df["Latitude"] = zip(*df["geometry"].apply(extract_coordinates))
+
+# Drop unnecessary columns
+df_clean = df.drop(columns=["id", "Ver ficha", "geometry"])  # Keep Longitude & Latitude
+
+# Encode categorical variables
+label_encoders = {}
+for column in df_clean.select_dtypes(include=["object"]).columns:
+    label_encoders[column] = LabelEncoder()
+    df_clean[column] = label_encoders[column].fit_transform(df_clean[column])
+
+# Define features and target
+X = df_clean.drop(columns=["Calificación según consumo"])  # Features
+y = df_clean["Calificación según consumo"]  # Target variable
+
+# Split data into training and test sets (80% train, 20% test)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train a RandomForest model
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# Predict on the test set
+y_pred = model.predict(X_test)
+
+# Calculate accuracy
+accuracy = accuracy_score(y_test, y_pred)
+mse = mean_squared_error(y_test, y_pred)
+print(f"Model Accuracy: {accuracy:.2%}")
+print(f"Mean Squared Error (MSE): {mse:.4f}")
+
+# Save the model and encoders
+joblib.dump(model, "energy_model.pkl")
+joblib.dump(label_encoders, "label_encoders.pkl")
+
+# Load the saved model for real-life prediction
+model = joblib.load("energy_model.pkl")
+label_encoders = joblib.load("label_encoders.pkl")
+# --- VISUALIZATION ---
+
+
+# Actual vs Predicted Histogram
+plt.figure(figsize=(8, 6))
+sns.histplot(y_test, color="blue", label="Actual", kde=True, bins=10)
+sns.histplot(y_pred, color="red", label="Predicted", kde=True, bins=10, alpha=0.6)
+plt.legend()
+plt.xlabel("Energy Efficiency Class")
+plt.ylabel("Frequency")
+plt.title("Actual vs Predicted Energy Efficiency Classes")
+plt.show()
+
+
+# Example Input: Real-Life Scenario
+example_data = {
+    "Tipo de inscripción": "Edificio Existente",
+    "Tipo de edificio": "Terciario - Edificio completo",
+    "Uso del edificio": "Residencial",
+    "Calificación según emisiones": "A",
+    "Longitude": -9.3,  # Example longitude
+    "Latitude": 36,   # Example latitude
+}
+
+# Encode example input
+encoded_example = {key: label_encoders[key].transform([value])[0] if key in label_encoders else value 
+                   for key, value in example_data.items()}
+example_df = pd.DataFrame([encoded_example])
+
+# Predict energy efficiency class
+prediction_encoded = model.predict(example_df)[0]
+prediction = label_encoders["Calificación según consumo"].inverse_transform([prediction_encoded])[0]
+
+# Energy efficiency message
+efficiency_message = "High energy efficiency" if prediction in ["A", "B"] else "Low energy efficiency, UPGRADE"
+
+# Show result
+print("\nReal-Life Example Prediction with Coordinates:")
+print(f"Input Data: {example_data}")
+print(f"Predicted Energy Efficiency Class: {prediction}")
+print(f"Message: {efficiency_message}")
