@@ -58,38 +58,7 @@ joblib.dump(label_encoders, "label_encoders.pkl")
 # Load the saved model for real-life prediction
 model = joblib.load("energy_model.pkl")
 label_encoders = joblib.load("label_encoders.pkl")
-# --- VISUALIZATION ---
 
-
-# Actual vs Predicted Histogram
-plt.figure(figsize=(8, 6))
-sns.histplot(y_test, color="blue", label="Actual", kde=True, bins=10)
-sns.histplot(y_pred, color="red", label="Predicted", kde=True, bins=10, alpha=0.6)
-plt.legend()
-plt.xlabel("Energy Efficiency Class")
-plt.ylabel("Frequency")
-plt.title("Actual vs Predicted Energy Efficiency Classes")
-plt.show()
-
-
-# Example Input: Real-Life Scenario
-example_data = {
-    "Tipo de inscripción": "Edificio Existente",
-    "Tipo de edificio": "Terciario - Edificio completo",
-    "Uso del edificio": "Residencial",
-    "Calificación según emisiones": "A",
-    "Longitude": -9.3,  # Example longitude
-    "Latitude": 36,   # Example latitude
-}
-
-# Encode example input
-encoded_example = {key: label_encoders[key].transform([value])[0] if key in label_encoders else value 
-                   for key, value in example_data.items()}
-example_df = pd.DataFrame([encoded_example])
-
-# Predict energy efficiency class
-prediction_encoded = model.predict(example_df)[0]
-prediction = label_encoders["Calificación según consumo"].inverse_transform([prediction_encoded])[0]
 
 # Energy efficiency message
 efficiency_message = "High energy efficiency" if prediction in ["A", "B"] else "Low energy efficiency, UPGRADE"
